@@ -89,7 +89,7 @@ function generateIndex(deployedNames, games) {
   const items = deployedNames
     .map((name) => {
       const display = byName.get(name)?.pkg.displayName ?? name;
-      return `      <li><a href="/${name}/">${display}</a></li>`;
+      return `    <li><a href="/${name}/">${display}</a></li>`;
     })
     .join("\n");
   fs.writeFileSync(
@@ -100,14 +100,6 @@ function generateIndex(deployedNames, games) {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Boardwalk</title>
-  <style>
-    body { font-family: system-ui, sans-serif; max-width: 40rem; margin: 4rem auto; padding: 0 1rem; background: #faf7f2; color: #2b2b2b; }
-    h1 { font-size: 2.5rem; }
-    ul { list-style: none; padding: 0; }
-    li { margin: 0.75rem 0; }
-    a { display: block; padding: 1rem 1.25rem; background: #fff; border: 1px solid #ddd; border-radius: 8px; text-decoration: none; color: #1a5fb4; font-size: 1.15rem; }
-    a:hover { border-color: #1a5fb4; }
-  </style>
 </head>
 <body>
   <h1>Boardwalk</h1>
