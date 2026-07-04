@@ -1,6 +1,6 @@
 # Boardwalk
 
-Static games monorepo. Production site: https://boardwalk.tristanpendergrass.com (Netlify). Each top-level folder is one game, served at `/<folder-name>/`. The site root is an auto-generated index page listing all games. There is no server component — everything is static assets.
+Static games monorepo. Production site: https://boardwalk.tristanpendergrass.com (Netlify site `boardwalk-tristan`, also reachable at https://boardwalk-tristan.netlify.app). Each top-level folder is one game, served at `/<folder-name>/`. The site root is an auto-generated index page listing all games. There is no server component — everything is static assets.
 
 ## Game folder convention
 
