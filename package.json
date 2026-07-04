@@ -1,0 +1,16 @@
+{
+  "name": "boardwalk",
+  "private": true,
+  "description": "Static games monorepo deployed to boardwalk.tristanpendergrass.com via Netlify",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "preview": "serve dist",
+    "deploy:draft": "npm run build && netlify deploy --dir dist",
+    "deploy": "npm run build && netlify deploy --prod --dir dist"
+  },
+  "devDependencies": {
+    "netlify-cli": "^21.0.0",
+    "serve": "^14.2.4"
+  }
+}
