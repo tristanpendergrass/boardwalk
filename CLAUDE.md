@@ -17,4 +17,6 @@ To add a new game: create a new kebab-case folder following the `hello-world/` s
 - `npm run deploy:draft` — build + deploy to a draft URL for checking.
 - `npm run deploy` — build + deploy to production.
 
+Both deploy scripts run the build through the Netlify CLI (`netlify deploy` builds by default), which injects environment variables configured in the Netlify UI into the local build. `VITE_GOOGLE_MAPS_API_KEY` holds the Google Maps API key (referrer-restricted browser key; the value is set in Netlify, never committed). The landing page footer shows "Google Maps API key: loaded/missing" as proof of the env var pipeline — plain `npm run build` shows "missing", which is expected.
+
 The folder is linked to the Netlify site via `.netlify/state.json`; the Netlify CLI is a devDependency, so no global install is needed.
