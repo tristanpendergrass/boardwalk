@@ -171,8 +171,10 @@ async function runSearch(maxMin) {
     setStatus(`${entries.length} restaurant${entries.length === 1 ? "" : "s"} within a ${maxMin} minute walk:${qualifier}`);
     for (const entry of entries) {
       const line = document.createElement("div");
-      const rating = entry.rating ? ` — ${entry.rating}★` : "";
-      line.textContent = `${entry.name} — ${entry.minutes} min walk${rating}`;
+      if (entry.rating) line.append(`${entry.rating}★ `);
+      const name = document.createElement("strong");
+      name.textContent = entry.name;
+      line.append(name, ` — ${entry.minutes} min walk`);
       resultsEl.appendChild(line);
     }
   } finally {
