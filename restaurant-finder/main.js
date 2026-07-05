@@ -107,7 +107,7 @@ let ctx = null;
 async function findPlaces(maxMin) {
   const { Place, SearchNearbyRankPreference, here } = ctx;
   const request = {
-    fields: ["id", "displayName", "location", "rating"],
+    fields: ["id", "displayName", "location", "rating", "userRatingCount"],
     locationRestriction: { center: here, radius: maxMin * WALK_SPEED_M_PER_MIN },
     includedPrimaryTypes: ["restaurant"],
     maxResultCount: 20,
@@ -157,6 +157,7 @@ async function runSearch(maxMin) {
       .map((place, i) => ({
         name: place.displayName,
         rating: place.rating,
+        ratingCount: place.userRatingCount,
         minutes: seconds[i] === null ? null : Math.max(1, Math.round(seconds[i] / 60)),
       }))
       .filter((e) => e.minutes !== null && e.minutes <= maxMin)
@@ -175,7 +176,10 @@ async function runSearch(maxMin) {
       const name = document.createElement("strong");
       name.textContent = entry.name;
       line.append(name);
-      if (entry.rating) line.append(` (${entry.rating}★)`);
+      if (entry.rating) {
+        const reviews = entry.ratingCount ? `, ${entry.ratingCount.toLocaleString()} reviews` : "";
+        line.append(` (${entry.rating}★${reviews})`);
+      }
       line.append(` — ${entry.minutes} min walk`);
       resultsEl.appendChild(line);
     }
