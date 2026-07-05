@@ -41,9 +41,19 @@ function findGames() {
   return games.sort((a, b) => a.name.localeCompare(b.name));
 }
 
+// VITE_* env vars get baked into game builds, so they must participate in the
+// incremental-build hash — otherwise a game built without a key would be
+// "unchanged, skipped" when the key later appears (or changes).
+const ENV_FINGERPRINT = JSON.stringify(
+  Object.entries(process.env)
+    .filter(([k]) => k.startsWith("VITE_"))
+    .sort()
+);
+
 // Content hash of a game's source tree (everything except node_modules/dist).
 function hashSourceTree(dir) {
   const hash = createHash("sha256");
+  hash.update(ENV_FINGERPRINT);
   const walk = (rel) => {
     const abs = path.join(dir, rel);
     for (const entry of fs.readdirSync(abs, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
