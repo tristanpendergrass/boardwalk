@@ -122,11 +122,7 @@ async function findPlaces(maxMin) {
   for (const place of [...byDistance.places, ...byPopularity.places]) {
     if (!seen.has(place.id)) seen.set(place.id, place);
   }
-  return {
-    places: [...seen.values()],
-    // Both searches maxed out, so there are probably more places than we can see.
-    truncated: byDistance.places.length === 20 && byPopularity.places.length === 20,
-  };
+  return [...seen.values()];
 }
 
 async function runSearch(maxMin) {
@@ -134,7 +130,7 @@ async function runSearch(maxMin) {
   resultsEl.replaceChildren();
   try {
     setStatus("Searching for restaurants…");
-    const { places, truncated } = await findPlaces(maxMin);
+    const places = await findPlaces(maxMin);
 
     if (places.length === 0) {
       setStatus(`No restaurants found within a ${maxMin} minute walk.`);
@@ -170,10 +166,7 @@ async function runSearch(maxMin) {
       return;
     }
 
-    const notes = [];
-    if (truncated) notes.push("more may exist — searches cap at 20 each");
-    if (estimated) notes.push("walk times are rough estimates — routing was unavailable");
-    const qualifier = notes.length > 0 ? ` (${notes.join("; ")})` : "";
+    const qualifier = estimated ? " (walk times are rough estimates — routing was unavailable)" : "";
     setStatus(`${entries.length} restaurant${entries.length === 1 ? "" : "s"} within a ${maxMin} minute walk:${qualifier}`);
     for (const entry of entries) {
       const li = document.createElement("li");
