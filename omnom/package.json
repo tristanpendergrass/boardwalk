@@ -1,6 +1,6 @@
 {
-  "name": "restaurant-finder",
-  "displayName": "Restaurant Finder",
+  "name": "omnom",
+  "displayName": "omnom",
   "private": true,
   "type": "module",
   "scripts": {

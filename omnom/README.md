@@ -1,4 +1,4 @@
-# Restaurant Finder
+# omnom
 
 Lists nearby restaurants with their Google Maps rating, review count, and real
 walking time, at an automatically chosen walking distance. The user sees only
@@ -39,7 +39,7 @@ starting at 2, and picks the level to display by these rules, in order:
 
 The user's position comes from the browser geolocation prompt. For testing,
 `?lat=..&lng=..` URL parameters skip geolocation entirely, e.g.
-`/restaurant-finder/?lat=47.6062&lng=-122.3321`.
+`/omnom/?lat=47.6062&lng=-122.3321`.
 
 ## Build
 
