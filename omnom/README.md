@@ -2,7 +2,7 @@
 
 Lists nearby restaurants with their Google Maps rating, review count, and real
 walking time, at an automatically chosen walking distance. The user sees only
-the outcome — "X restaurants within a Y minute walk" — never the search knobs.
+the resulting list — never the search knobs.
 
 Line format: **Name** (4.7★, 1,234 reviews) — 3 min walk. Sorted by rating,
 best first; unrated places sink to the bottom, walk time breaks ties.

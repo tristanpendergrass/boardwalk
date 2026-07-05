@@ -187,8 +187,8 @@ function render(entries, maxMin) {
     // Best-rated first; unrated places sink to the bottom, walk time breaks ties.
     (a, b) => (b.rating ?? 0) - (a.rating ?? 0) || a.minutes - b.minutes
   );
-  const qualifier = ctx.anyEstimated ? " (walk times are rough estimates — routing was unavailable)" : "";
-  setStatus(`${sorted.length} restaurant${sorted.length === 1 ? "" : "s"} within a ${maxMin} minute walk:${qualifier}`);
+  // Clear the progress message; the list speaks for itself.
+  setStatus(ctx.anyEstimated ? "Walk times are rough estimates — routing was unavailable." : "");
   for (const entry of sorted) {
     const line = document.createElement("div");
     const name = document.createElement("strong");
