@@ -6,7 +6,7 @@ Static games monorepo. Production site: https://boardwalk.tristanpendergrass.com
 
 A game is any top-level folder with a `package.json` whose `scripts.build` writes final static assets (including an `index.html`) to `<game>/dist/`. Optional `displayName` field in package.json sets the name shown on the landing page (falls back to folder name).
 
-To add a new game: create a new kebab-case folder following the `hello-world/` structure (any stack is fine — Vite, plain HTML, whatever — as long as `npm run build` produces `dist/index.html`).
+To add a new game: create a new kebab-case folder following the `omnom/` structure (any stack is fine — Vite, plain HTML, whatever — as long as `npm run build` produces `dist/index.html`).
 
 **Games must use relative asset paths** (`./main.js`, not `/main.js`) — they are served from `/<game>/`, not the site root. For Vite games, set `base: "./"` in vite.config.
 
