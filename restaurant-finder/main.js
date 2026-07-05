@@ -1,15 +1,18 @@
-// Lists restaurants within a 5 minute walk of the user's location, nearest first.
-// Walk times come from the Routes API route matrix (real walking routes); if that
-// call fails we fall back to straight-line estimates at a typical walking pace.
-// The 400m search radius is a safe pre-filter either way: a walking route is never
-// shorter than the straight line, so every <=5 min walk lies inside it.
+// Lists restaurants within a chosen walking time of the user's location.
+// Each distance button re-runs the search: two Places nearby searches (nearest 20
+// + most popular 20, deduped — the API caps each search at 20 results), then the
+// Routes API route matrix for real walking durations, filtered to the time limit
+// and sorted nearest-first. If routing fails we fall back to straight-line
+// estimates at a typical walking pace, labeled as such.
+// The search radius is a safe pre-filter: a walking route is never shorter than
+// the straight line, so every walk under the limit lies inside it.
 
 const WALK_SPEED_M_PER_MIN = 80; // ~4.8 km/h
-const MAX_WALK_MIN = 5;
-const RADIUS_M = WALK_SPEED_M_PER_MIN * MAX_WALK_MIN;
+const DEFAULT_WALK_MIN = 5;
 
 const statusEl = document.getElementById("status");
 const resultsEl = document.getElementById("results");
+const buttons = [...document.querySelectorAll("button[data-minutes]")];
 
 function setStatus(text) {
   statusEl.textContent = text;
@@ -98,7 +101,92 @@ function haversineMeters(a, b) {
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
-async function main() {
+// Set once by init(), used by every search.
+let ctx = null;
+
+async function findPlaces(maxMin) {
+  const { Place, SearchNearbyRankPreference, here } = ctx;
+  const request = {
+    fields: ["id", "displayName", "location"],
+    locationRestriction: { center: here, radius: maxMin * WALK_SPEED_M_PER_MIN },
+    includedPrimaryTypes: ["restaurant"],
+    maxResultCount: 20,
+  };
+  // Two searches, deduped: each is capped at 20 results, so the nearest 20 and
+  // the 20 most popular together give better coverage of larger radii.
+  const [byDistance, byPopularity] = await Promise.all([
+    Place.searchNearby({ ...request, rankPreference: SearchNearbyRankPreference.DISTANCE }),
+    Place.searchNearby({ ...request, rankPreference: SearchNearbyRankPreference.POPULARITY }),
+  ]);
+  const seen = new Map();
+  for (const place of [...byDistance.places, ...byPopularity.places]) {
+    if (!seen.has(place.id)) seen.set(place.id, place);
+  }
+  return {
+    places: [...seen.values()],
+    // Both searches maxed out, so there are probably more places than we can see.
+    truncated: byDistance.places.length === 20 && byPopularity.places.length === 20,
+  };
+}
+
+async function runSearch(maxMin) {
+  for (const b of buttons) b.disabled = true;
+  resultsEl.replaceChildren();
+  try {
+    setStatus("Searching for restaurants…");
+    const { places, truncated } = await findPlaces(maxMin);
+
+    if (places.length === 0) {
+      setStatus(`No restaurants found within a ${maxMin} minute walk.`);
+      return;
+    }
+
+    setStatus("Computing walking times…");
+    let estimated = false;
+    let seconds;
+    try {
+      seconds = await walkingSeconds(ctx.key, ctx.here, places);
+    } catch (err) {
+      console.warn("Routes API unavailable, falling back to straight-line estimates:", err);
+      estimated = true;
+      seconds = places.map(
+        (place) =>
+          (haversineMeters(ctx.here, { lat: place.location.lat(), lng: place.location.lng() }) /
+            WALK_SPEED_M_PER_MIN) *
+          60
+      );
+    }
+
+    const entries = places
+      .map((place, i) => ({
+        name: place.displayName,
+        minutes: seconds[i] === null ? null : Math.max(1, Math.round(seconds[i] / 60)),
+      }))
+      .filter((e) => e.minutes !== null && e.minutes <= maxMin)
+      .sort((a, b) => a.minutes - b.minutes || a.name.localeCompare(b.name));
+
+    if (entries.length === 0) {
+      setStatus(`No restaurants found within a ${maxMin} minute walk.`);
+      return;
+    }
+
+    const notes = [];
+    if (truncated) notes.push("more may exist — searches cap at 20 each");
+    if (estimated) notes.push("walk times are rough estimates — routing was unavailable");
+    const qualifier = notes.length > 0 ? ` (${notes.join("; ")})` : "";
+    setStatus(`${entries.length} restaurant${entries.length === 1 ? "" : "s"} within a ${maxMin} minute walk:${qualifier}`);
+    for (const entry of entries) {
+      const li = document.createElement("li");
+      li.textContent = `${entry.name} — ${entry.minutes} min walk`;
+      resultsEl.appendChild(li);
+    }
+  } finally {
+    // Re-enable all buttons except the active selection.
+    for (const b of buttons) b.disabled = Number(b.dataset.minutes) === maxMin;
+  }
+}
+
+async function init() {
   const key = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
   if (!key) {
     setStatus("This build has no Google Maps API key baked in (VITE_GOOGLE_MAPS_API_KEY was not set at build time).");
@@ -108,58 +196,17 @@ async function main() {
   setStatus("Getting your location…");
   const here = await getPosition();
 
-  setStatus("Searching for restaurants…");
+  setStatus("Loading Google Maps…");
   await loadMapsApi(key);
   const { Place, SearchNearbyRankPreference } = await google.maps.importLibrary("places");
-  const { places } = await Place.searchNearby({
-    fields: ["id", "displayName", "location"],
-    locationRestriction: { center: here, radius: RADIUS_M },
-    includedPrimaryTypes: ["restaurant"],
-    maxResultCount: 20,
-    rankPreference: SearchNearbyRankPreference.DISTANCE,
-  });
+  ctx = { key, here, Place, SearchNearbyRankPreference };
 
-  if (places.length === 0) {
-    setStatus(`No restaurants found within a ${MAX_WALK_MIN} minute walk.`);
-    return;
+  for (const button of buttons) {
+    button.addEventListener("click", () => {
+      runSearch(Number(button.dataset.minutes)).catch((err) => setStatus(`Something went wrong: ${err.message}`));
+    });
   }
-
-  setStatus("Computing walking times…");
-  let estimated = false;
-  let seconds;
-  try {
-    seconds = await walkingSeconds(key, here, places);
-  } catch (err) {
-    console.warn("Routes API unavailable, falling back to straight-line estimates:", err);
-    estimated = true;
-    seconds = places.map(
-      (place) =>
-        (haversineMeters(here, { lat: place.location.lat(), lng: place.location.lng() }) /
-          WALK_SPEED_M_PER_MIN) *
-        60
-    );
-  }
-
-  const entries = places
-    .map((place, i) => ({
-      name: place.displayName,
-      minutes: seconds[i] === null ? null : Math.max(1, Math.round(seconds[i] / 60)),
-    }))
-    .filter((e) => e.minutes !== null && e.minutes <= MAX_WALK_MIN)
-    .sort((a, b) => a.minutes - b.minutes);
-
-  if (entries.length === 0) {
-    setStatus(`No restaurants found within a ${MAX_WALK_MIN} minute walk.`);
-    return;
-  }
-
-  const qualifier = estimated ? " (walk times are rough estimates — routing was unavailable)" : "";
-  setStatus(`${entries.length} restaurant${entries.length === 1 ? "" : "s"} within a ${MAX_WALK_MIN} minute walk:${qualifier}`);
-  for (const entry of entries) {
-    const li = document.createElement("li");
-    li.textContent = `${entry.name} — ${entry.minutes} min walk`;
-    resultsEl.appendChild(li);
-  }
+  await runSearch(DEFAULT_WALK_MIN);
 }
 
-main().catch((err) => setStatus(`Something went wrong: ${err.message}`));
+init().catch((err) => setStatus(`Something went wrong: ${err.message}`));
