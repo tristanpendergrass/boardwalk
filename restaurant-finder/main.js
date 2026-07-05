@@ -160,7 +160,8 @@ async function runSearch(maxMin) {
         minutes: seconds[i] === null ? null : Math.max(1, Math.round(seconds[i] / 60)),
       }))
       .filter((e) => e.minutes !== null && e.minutes <= maxMin)
-      .sort((a, b) => a.minutes - b.minutes || a.name.localeCompare(b.name));
+      // Best-rated first; unrated places sink to the bottom, walk time breaks ties.
+      .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0) || a.minutes - b.minutes);
 
     if (entries.length === 0) {
       setStatus(`No restaurants found within a ${maxMin} minute walk.`);
