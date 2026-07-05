@@ -1,18 +1,30 @@
-// Lists restaurants within a chosen walking time of the user's location.
-// Each distance button re-runs the search: two Places nearby searches (nearest 20
-// + most popular 20, deduped — the API caps each search at 20 results), then the
-// Routes API route matrix for real walking durations, filtered to the time limit
-// and sorted nearest-first. If routing fails we fall back to straight-line
+// Lists nearby restaurants at an automatically chosen walking distance.
+//
+// The radius is picked by stepping up through walk-time levels, aiming for a
+// list with enough well-rated options (details opaque to the user):
+//   - start at the smallest level
+//   - stop when the current level has 4+ restaurants rated 4.5+
+//   - stop when the next level up would not add a new 4.5+ restaurant,
+//     unless the current level has fewer than 5 restaurants total
+//   - the largest level is a hard cap
+//
+// Each level runs two Places nearby searches (nearest 20 + most popular 20,
+// deduped — the API caps each search at 20 results), then the Routes API route
+// matrix for real walking durations, filtered to the level's time limit.
+// Durations are cached per place, so peeking at the next level only routes
+// places we haven't seen yet. If routing fails we fall back to straight-line
 // estimates at a typical walking pace, labeled as such.
-// The search radius is a safe pre-filter: a walking route is never shorter than
-// the straight line, so every walk under the limit lies inside it.
+// The search radius is a safe pre-filter: a walking route is never shorter
+// than the straight line, so every walk under the limit lies inside it.
 
 const WALK_SPEED_M_PER_MIN = 80; // ~4.8 km/h
-const DEFAULT_WALK_MIN = 5;
+const WALK_LEVELS_MIN = [2, 5, 10, 20, 30];
+const GOOD_RATING = 4.5;
+const ENOUGH_GOOD = 4;
+const MIN_RESULTS = 5;
 
 const statusEl = document.getElementById("status");
 const resultsEl = document.getElementById("results");
-const buttons = [...document.querySelectorAll("button[data-minutes]")];
 
 function setStatus(text) {
   statusEl.textContent = text;
@@ -61,7 +73,7 @@ function getPosition() {
 }
 
 // Real walking durations via the Routes API route matrix: one request, the user
-// as origin, every found place as a destination. Returns seconds per place index
+// as origin, every given place as a destination. Returns seconds per place index
 // (null where no route came back).
 async function walkingSeconds(key, origin, places) {
   const res = await fetch("https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix", {
@@ -125,68 +137,86 @@ async function findPlaces(maxMin) {
   return [...seen.values()];
 }
 
-async function runSearch(maxMin) {
-  for (const b of buttons) b.disabled = true;
-  resultsEl.replaceChildren();
-  try {
-    setStatus("Searching for restaurants…");
-    const places = await findPlaces(maxMin);
-
-    if (places.length === 0) {
-      setStatus(`No restaurants found within a ${maxMin} minute walk.`);
-      return;
-    }
-
-    setStatus("Computing walking times…");
-    let estimated = false;
+// Walking seconds per place, routing only places not already cached this session.
+async function secondsFor(places) {
+  const uncached = places.filter((p) => !ctx.secondsByPlaceId.has(p.id));
+  if (uncached.length > 0) {
     let seconds;
     try {
-      seconds = await walkingSeconds(ctx.key, ctx.here, places);
+      seconds = await walkingSeconds(ctx.key, ctx.here, uncached);
     } catch (err) {
       console.warn("Routes API unavailable, falling back to straight-line estimates:", err);
-      estimated = true;
-      seconds = places.map(
+      ctx.anyEstimated = true;
+      seconds = uncached.map(
         (place) =>
           (haversineMeters(ctx.here, { lat: place.location.lat(), lng: place.location.lng() }) /
             WALK_SPEED_M_PER_MIN) *
           60
       );
     }
-
-    const entries = places
-      .map((place, i) => ({
-        name: place.displayName,
-        rating: place.rating,
-        ratingCount: place.userRatingCount,
-        minutes: seconds[i] === null ? null : Math.max(1, Math.round(seconds[i] / 60)),
-      }))
-      .filter((e) => e.minutes !== null && e.minutes <= maxMin)
-      // Best-rated first; unrated places sink to the bottom, walk time breaks ties.
-      .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0) || a.minutes - b.minutes);
-
-    if (entries.length === 0) {
-      setStatus(`No restaurants found within a ${maxMin} minute walk.`);
-      return;
-    }
-
-    const qualifier = estimated ? " (walk times are rough estimates — routing was unavailable)" : "";
-    setStatus(`${entries.length} restaurant${entries.length === 1 ? "" : "s"} within a ${maxMin} minute walk:${qualifier}`);
-    for (const entry of entries) {
-      const line = document.createElement("div");
-      const name = document.createElement("strong");
-      name.textContent = entry.name;
-      line.append(name);
-      if (entry.rating) {
-        const reviews = entry.ratingCount ? `, ${entry.ratingCount.toLocaleString()} reviews` : "";
-        line.append(` (${entry.rating}★${reviews})`);
-      }
-      line.append(` — ${entry.minutes} min walk`);
-      resultsEl.appendChild(line);
-    }
-  } finally {
-    // Re-enable all buttons except the active selection.
-    for (const b of buttons) b.disabled = Number(b.dataset.minutes) === maxMin;
+    uncached.forEach((place, i) => ctx.secondsByPlaceId.set(place.id, seconds[i]));
   }
+  return places.map((p) => ctx.secondsByPlaceId.get(p.id));
+}
+
+// All restaurants reachable within maxMin minutes of walking.
+async function entriesWithin(maxMin) {
+  const places = await findPlaces(maxMin);
+  const seconds = await secondsFor(places);
+  return places
+    .map((place, i) => ({
+      name: place.displayName,
+      rating: place.rating,
+      ratingCount: place.userRatingCount,
+      minutes: seconds[i] === null ? null : Math.max(1, Math.round(seconds[i] / 60)),
+    }))
+    .filter((e) => e.minutes !== null && e.minutes <= maxMin);
+}
+
+function countGood(entries) {
+  return entries.filter((e) => e.rating >= GOOD_RATING).length;
+}
+
+function render(entries, maxMin) {
+  resultsEl.replaceChildren();
+  if (entries.length === 0) {
+    setStatus(`No restaurants found within a ${maxMin} minute walk.`);
+    return;
+  }
+  const sorted = [...entries].sort(
+    // Best-rated first; unrated places sink to the bottom, walk time breaks ties.
+    (a, b) => (b.rating ?? 0) - (a.rating ?? 0) || a.minutes - b.minutes
+  );
+  const qualifier = ctx.anyEstimated ? " (walk times are rough estimates — routing was unavailable)" : "";
+  setStatus(`${sorted.length} restaurant${sorted.length === 1 ? "" : "s"} within a ${maxMin} minute walk:${qualifier}`);
+  for (const entry of sorted) {
+    const line = document.createElement("div");
+    const name = document.createElement("strong");
+    name.textContent = entry.name;
+    line.append(name);
+    if (entry.rating) {
+      const reviews = entry.ratingCount ? `, ${entry.ratingCount.toLocaleString()} reviews` : "";
+      line.append(` (${entry.rating}★${reviews})`);
+    }
+    line.append(` — ${entry.minutes} min walk`);
+    resultsEl.appendChild(line);
+  }
+}
+
+async function autoSearch() {
+  setStatus("Searching for restaurants…");
+  let level = WALK_LEVELS_MIN[0];
+  let entries = await entriesWithin(level);
+  for (let i = 0; i + 1 < WALK_LEVELS_MIN.length; i++) {
+    if (countGood(entries) >= ENOUGH_GOOD) break;
+    const nextEntries = await entriesWithin(WALK_LEVELS_MIN[i + 1]);
+    // Expanding must earn its keep: stop unless the next level adds a well-rated
+    // option — but too-short lists always expand.
+    if (entries.length >= MIN_RESULTS && countGood(nextEntries) <= countGood(entries)) break;
+    level = WALK_LEVELS_MIN[i + 1];
+    entries = nextEntries;
+  }
+  render(entries, level);
 }
 
 async function init() {
@@ -202,14 +232,9 @@ async function init() {
   setStatus("Loading Google Maps…");
   await loadMapsApi(key);
   const { Place, SearchNearbyRankPreference } = await google.maps.importLibrary("places");
-  ctx = { key, here, Place, SearchNearbyRankPreference };
+  ctx = { key, here, Place, SearchNearbyRankPreference, secondsByPlaceId: new Map(), anyEstimated: false };
 
-  for (const button of buttons) {
-    button.addEventListener("click", () => {
-      runSearch(Number(button.dataset.minutes)).catch((err) => setStatus(`Something went wrong: ${err.message}`));
-    });
-  }
-  await runSearch(DEFAULT_WALK_MIN);
+  await autoSearch();
 }
 
 init().catch((err) => setStatus(`Something went wrong: ${err.message}`));
