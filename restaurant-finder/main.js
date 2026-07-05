@@ -3,7 +3,7 @@
 // The radius is picked by stepping up through walk-time levels, aiming for a
 // list with enough well-rated options (details opaque to the user):
 //   - start at the smallest level
-//   - stop when the current level has 4+ restaurants rated 4.5+
+//   - stop when the current level has 3+ restaurants rated 4.5+
 //   - stop when the next level up would not add a new 4.5+ restaurant,
 //     unless the current level has fewer than 5 restaurants total
 //   - the largest level is a hard cap
@@ -20,7 +20,7 @@
 const WALK_SPEED_M_PER_MIN = 80; // ~4.8 km/h
 const WALK_LEVELS_MIN = [2, 5, 10, 20, 30];
 const GOOD_RATING = 4.5;
-const ENOUGH_GOOD = 4;
+const ENOUGH_GOOD = 3;
 const MIN_RESULTS = 5;
 
 const statusEl = document.getElementById("status");
