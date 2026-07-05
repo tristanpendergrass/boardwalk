@@ -95,9 +95,6 @@ function buildGame(game) {
 }
 
 function generateIndex(deployedNames, games) {
-  // Proof of life for the Netlify env var pipeline: the key is injected when the
-  // build runs via `netlify deploy`/`netlify build`, absent in plain local builds.
-  const keyStatus = process.env.VITE_GOOGLE_MAPS_API_KEY ? "loaded" : "missing";
   const byName = new Map(games.map((g) => [g.name, g]));
   const items = deployedNames
     .map((name) => {
@@ -120,7 +117,6 @@ function generateIndex(deployedNames, games) {
   <ul>
 ${items}
   </ul>
-  <p><small>Google Maps API key: ${keyStatus}</small></p>
 </body>
 </html>
 `
