@@ -4,10 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Restaurant Finder</title>
+  <style>p { margin: 0; }</style>
 </head>
 <body>
-  <h1>Restaurant Finder</h1>
-  <p>Restaurants within a short walk of you. Walking distance:
+  <p>Nearby Restaurants</p>
+  <p>Walking distance:
     <button data-minutes="2">2 min</button>
     <button data-minutes="5">5 min</button>
     <button data-minutes="10">10 min</button>
@@ -15,7 +16,7 @@
     <button data-minutes="30">30 min</button>
   </p>
   <p id="status">Loading…</p>
-  <ul id="results"></ul>
+  <div id="results"></div>
   <script type="module" src="./main.js"></script>
 </body>
 </html>

@@ -169,9 +169,9 @@ async function runSearch(maxMin) {
     const qualifier = estimated ? " (walk times are rough estimates — routing was unavailable)" : "";
     setStatus(`${entries.length} restaurant${entries.length === 1 ? "" : "s"} within a ${maxMin} minute walk:${qualifier}`);
     for (const entry of entries) {
-      const li = document.createElement("li");
-      li.textContent = `${entry.name} — ${entry.minutes} min walk`;
-      resultsEl.appendChild(li);
+      const line = document.createElement("div");
+      line.textContent = `${entry.name} — ${entry.minutes} min walk`;
+      resultsEl.appendChild(line);
     }
   } finally {
     // Re-enable all buttons except the active selection.
