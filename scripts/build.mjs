@@ -113,7 +113,6 @@ function generateIndex(deployedNames, games) {
 </head>
 <body>
   <h1>Boardwalk</h1>
-  <p>A collection of games.</p>
   <ul>
 ${items}
   </ul>
