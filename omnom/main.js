@@ -200,18 +200,17 @@ function render(entries, maxMin) {
       line.append(` (${entry.rating}★${reviews})`);
     }
     line.append(` — ${entry.minutes} min walk — `);
-    // Google Maps URL scheme: opens the Google Maps app on phones that have it.
-    // Origin is omitted so directions start from the user's current location.
-    const directions = document.createElement("a");
-    directions.href =
-      "https://www.google.com/maps/dir/?api=1" +
-      `&destination=${encodeURIComponent(entry.name)}` +
-      `&destination_place_id=${encodeURIComponent(entry.id)}` +
-      "&travelmode=walking";
-    directions.textContent = "Directions";
-    directions.target = "_blank";
-    directions.rel = "noopener";
-    line.append(directions);
+    // Google Maps URL scheme: opens the place's profile in the Google Maps app
+    // on phones that have it, where the user can start directions themselves.
+    const mapLink = document.createElement("a");
+    mapLink.href =
+      "https://www.google.com/maps/search/?api=1" +
+      `&query=${encodeURIComponent(entry.name)}` +
+      `&query_place_id=${encodeURIComponent(entry.id)}`;
+    mapLink.textContent = "Map";
+    mapLink.target = "_blank";
+    mapLink.rel = "noopener";
+    line.append(mapLink);
     resultsEl.appendChild(line);
   }
 }
