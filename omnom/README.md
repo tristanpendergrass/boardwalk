@@ -28,6 +28,11 @@ starting at 2, and picks the level to display by these rules, in order:
 - Two Places API (New) nearby searches run per level — nearest 20 and most
   popular 20 (`rankPreference` DISTANCE and POPULARITY) — deduped by place ID,
   because the API hard-caps each search at 20 results.
+- Only places open for business right now are kept: `businessStatus` must be
+  OPERATIONAL (drops temporarily/permanently closed places) and `isOpen()` must
+  confirm the place is open at this moment — places with unknown hours count as
+  closed. This filter runs before routing, so closed places never cost matrix
+  elements and never influence the level-picking rules.
 - Real walking durations come from one Routes API `computeRouteMatrix` call
   (travel mode WALK, the user as origin, place IDs as destinations), then
   results are filtered to the level's time limit. Durations are cached per

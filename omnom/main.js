@@ -119,7 +119,17 @@ let ctx = null;
 async function findPlaces(maxMin) {
   const { Place, SearchNearbyRankPreference, here } = ctx;
   const request = {
-    fields: ["id", "displayName", "location", "rating", "userRatingCount"],
+    fields: [
+      "id",
+      "displayName",
+      "location",
+      "rating",
+      "userRatingCount",
+      // The three fields isOpen() needs to answer locally, without extra requests.
+      "businessStatus",
+      "regularOpeningHours",
+      "utcOffsetMinutes",
+    ],
     locationRestriction: { center: here, radius: maxMin * WALK_SPEED_M_PER_MIN },
     includedPrimaryTypes: ["restaurant"],
     maxResultCount: 20,
@@ -134,7 +144,35 @@ async function findPlaces(maxMin) {
   for (const place of [...byDistance.places, ...byPopularity.places]) {
     if (!seen.has(place.id)) seen.set(place.id, place);
   }
-  return [...seen.values()];
+  const merged = [...seen.values()];
+  // Only places open for business right now: not temporarily/permanently closed,
+  // and confirmed open at this moment (unknown hours count as closed). Filtering
+  // here keeps closed places out of the route matrix and the level-picking rules.
+  return merged.filter((place) => place.businessStatus === "OPERATIONAL" && isOpenNow(place));
+}
+
+// Whether a place is open at this moment, computed from its weekly opening
+// periods in the place's own timezone (Place.isOpen() needs the beta API channel,
+// so we do the math ourselves). Unknown hours count as closed.
+function isOpenNow(place) {
+  const periods = place.regularOpeningHours?.periods;
+  const offset = place.utcOffsetMinutes;
+  if (!periods || periods.length === 0 || typeof offset !== "number") return false;
+  // Open 24/7 is encoded as a single period with no close.
+  if (periods.length === 1 && !periods[0].close) return true;
+
+  const WEEK_MIN = 7 * 24 * 60;
+  // "Now" as minutes into the week at the place's location.
+  const local = new Date(Date.now() + offset * 60000);
+  const now = local.getUTCDay() * 1440 + local.getUTCHours() * 60 + local.getUTCMinutes();
+
+  return periods.some((p) => {
+    if (!p.open || !p.close) return false;
+    const start = p.open.day * 1440 + p.open.hour * 60 + p.open.minute;
+    let end = p.close.day * 1440 + p.close.hour * 60 + p.close.minute;
+    if (end <= start) end += WEEK_MIN; // spans midnight (or Saturday→Sunday)
+    return (now >= start && now < end) || (now + WEEK_MIN >= start && now + WEEK_MIN < end);
+  });
 }
 
 // Walking seconds per place, routing only places not already cached this session.
