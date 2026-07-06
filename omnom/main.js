@@ -165,6 +165,7 @@ async function entriesWithin(maxMin) {
   const seconds = await secondsFor(places);
   return places
     .map((place, i) => ({
+      id: place.id,
       name: place.displayName,
       rating: place.rating,
       ratingCount: place.userRatingCount,
@@ -198,7 +199,19 @@ function render(entries, maxMin) {
       const reviews = entry.ratingCount ? `, ${entry.ratingCount.toLocaleString()} reviews` : "";
       line.append(` (${entry.rating}★${reviews})`);
     }
-    line.append(` — ${entry.minutes} min walk`);
+    line.append(` — ${entry.minutes} min walk — `);
+    // Google Maps URL scheme: opens the Google Maps app on phones that have it.
+    // Origin is omitted so directions start from the user's current location.
+    const directions = document.createElement("a");
+    directions.href =
+      "https://www.google.com/maps/dir/?api=1" +
+      `&destination=${encodeURIComponent(entry.name)}` +
+      `&destination_place_id=${encodeURIComponent(entry.id)}` +
+      "&travelmode=walking";
+    directions.textContent = "Directions";
+    directions.target = "_blank";
+    directions.rel = "noopener";
+    line.append(directions);
     resultsEl.appendChild(line);
   }
 }
